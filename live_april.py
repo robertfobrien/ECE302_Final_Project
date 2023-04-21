@@ -2,6 +2,7 @@ import cv2
 import apriltag
 import numpy as np
 import a_star
+import send_to_pi
 
 # how to use: 
 # 1: hook up camera
