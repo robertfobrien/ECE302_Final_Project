@@ -18,29 +18,31 @@ options.families = "tag36h11" # "tag16h5"
 detector = apriltag.Detector(options)
 
 # Set all thje parameters
+
 tag_size = 6  # cm
 focal_length = 60  # pixels
+
 car_tag_id = 0
 A_tag_id = 1
 B_id_tag = 2
 C_id_tag = 3
 target_tag_id = A_tag_id
 destination_tag_id = 4
+
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
+
 read_from_image = True # read from image, TRUE; read from live camera, FALSE
-jpg_fn = "test_6.3.jpeg"
-inflation_of_obstacles = 10 # %
+
+jpg_fn = "test_1.jpeg"
+
 # Define the size of the grid that we will run a* from 
 grid_size = (20, 30)
-# END SETTINGs
-
-
 
 # Initialize empty path for tag ID 0
 car_path = []
 
-
+# END SETTINGs
 
 print ("Now in setup mode. Set up the car and blocks to begin. Press A, B or C to make them the target blocks. Press 'q' to find a path.")
 print()
@@ -57,22 +59,19 @@ while True:
     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     tags = detector.detect(frame_gray)
 
-    	
     blank = np.zeros((frame.shape[0] , frame.shape[1],3), np.uint8)
-
     
     # Draw bounding boxes around detected tags and calculate distance
     for tag in tags:
         # Get tag ID and corner coordinates
         tag_id = tag.tag_id
         corners = tag.corners.astype(int)
+        # pose gives us direction and size data etc. could be useful later
         tag_pose = detector.detection_pose(detection=tag, camera_params=camera_params, tag_size=30, z_sign=1)
-        #print(tag_pose[0])
-        #print("")
 
-         # Draw bounding box with color based on tag ID
+        # Draw bounding box with color based on tag ID
         if tag_id == car_tag_id:
-            color = (0, 255, 0)  #blue
+            color = (0, 255, 0)  #green
             label = "Car"
         elif tag_id == A_tag_id:
             color = (0, 0, 255)  # Red
@@ -84,27 +83,24 @@ while True:
             color = (0, 0, 255)  # Red
             label = "C"
         elif tag_id is destination_tag_id:
-            color = (0, 255, 0)  # blue
+            color = (0, 255, 0)  # green
             label = "Destination"
         else:
             color = color = (0, 0, 255)  # Red
             label = "obstacle"
 
-        #overwrites whatever one is the target box to make it green
+        #overwrites whatever one is the target box to make it blue
         if tag_id is target_tag_id:
-            color = (255, 0, 0)  # blue
+            color = (255, 0, 0) 
         
-        cv2.polylines(frame, [corners], True, color, 3)
-        #print(tag.center.astype(int))
-        #print("")
-
         #outlines the tag
+        cv2.polylines(frame, [corners], True, color, 3)
         cv2.polylines(blank, [corners], True, color, 3)
 
         #fills it in with its color
         cv2.fillPoly(blank, [corners], color)
         
-        # Calculate distance to tag (this doesnt work right now)
+        # Calculate distance to tag (this doesnt work right now, could be useful later)
         tag_size_in_pixels = max(abs(corners[:,0]-corners[:,1]))  # assume square tag
         distance = (tag_size * focal_length) / tag_size_in_pixels
         
@@ -155,6 +151,7 @@ destination_loc_cell = []
 a_star_path_cell_to_target = []
 grid = np.zeros(shape=grid_size, dtype=int)
 
+# getting some variables: 
 height, width, channels = blank.shape
 cell_width = width // grid_size[1]
 cell_height = height // grid_size[0]
@@ -181,8 +178,6 @@ for tag in tags:
     else:
         obstacle_locs_pixels.append( center )
         obstacle_locs_cell.append( pixels_to_cell(center) )
-        
-        #this cell marks obstacles on the maze
 
 # VISUALIZE GRID
 #first seperate the image into a grid:
@@ -211,28 +206,19 @@ for i in range(grid_size[0]):
         #    print(i, j)
            grid[i:i+1,  j:j+1] = 1
 
-#print("car loc p:" + (str)(car_loc_pixels))
-#print("car loc c:" + (str)(car_loc_cell))
-#print("target loc p:" + (str)(target_loc_pixels))
-#print("target loc c:" + (str)(target_loc_cell))
+#prints the full grid: 
 #with np.printoptions(threshold=np.inf):
 #    print(grid)
 
 #RUNS ASTAR ON "grid" matrix with car_loc_cell, target_loc_cell, obstacle_locs_cell
-
 a_star_path_cell_to_target = a_star.astar(maze=grid, start=car_loc_cell, end=target_loc_cell)
 a_star_path_cell_to_destination = a_star.astar(maze=grid, start=target_loc_cell, end=destination_loc_cell)
 
 # converts cell coordinates into pixel coordinates
 for cell in a_star_path_cell_to_target:
     a_star_path_pixels_to_target.append( cells_to_pixels(cell) )
-
 for cell in a_star_path_cell_to_destination:
     a_star_path_pixels_to_destination.append( cells_to_pixels(cell) )
-
-#print()
-#print("pixel path to target: \n" + (str)(a_star_path_pixels_to_target))
-
 
 # add path to the photo in red
 for i in range(len(a_star_path_pixels_to_target)-1):
@@ -245,14 +231,12 @@ for i in range(len(a_star_path_pixels_to_destination)-1):
 print ("Now showing the A * algoritm. This is the path the car will follow. Press 'q' to go back to live feed with the path overlayed.")
 print()
 
-
 while True:
     cv2.imshow("AprilTag Tracking: Obstacles and motion plan", blank)
     # Press 'q' to quit
     if cv2.waitKey(1) & 0xFF == ord('q'):
         #print(car_path)
         break
-
 
 print("Now back in live feed. Press 'q' again and the car will begin its route:")
 print()
