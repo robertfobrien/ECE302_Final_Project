@@ -68,8 +68,7 @@ def get_middle_point(point1, point2):
 
 #takes in the corners of the car AprilTag, and the image with the line it should be following
 #returns some value corresponding to the car in relation to the line
-def get_car_to_path_distance(car_corners, image):
-
+def get_car_to_path_distance(pid, car_corners, image):
     # left middle part of car tag
     l = get_middle_point(car_corners[0],car_corners[3])
     # right middle part of car tag
@@ -90,10 +89,18 @@ def get_car_to_path_distance(car_corners, image):
 
 
     while True:
+
+         #iterates through every pixel between the left and right parts of the tag
+        # the 0.5 is a trick to to round to make sure we round to nearest integer
+        p[0] = (int)(p[0] + dx +(0.5))
+        p[1] = (int)(p[1] + dy + (0.5))
+
         # if the  pixel is pure red: 
+        #print("     image r:", (int)(image[p[1],p[0]][2]))
         if (int)(image[p[1],p[0]][2]) == 255 and (int)(image[p[1],p[0]][1]) == 0 and (int)(image[p[1],p[0]][0]) == 0:
             #print("found red pixel")
-            break
+            #print("output: ", math.dist(p,l) - math.dist(p,r))
+            pid.measurement = math.dist(p,l) - math.dist(p,r)
 
         if p[1] >= image.shape[0] - 5 or p[1] < 0 :
             #print("didnt find red line, went outside of image")
@@ -102,14 +109,6 @@ def get_car_to_path_distance(car_corners, image):
         if p[0] > image.shape[1] - 5 or p[0] < 0:
             #print("didnt find red line, went outside of image")
             break
-
-        #iterates through every pixel between the left and right parts of the tag
-        # the 0.5 is a trick to to round to make sure we round to nearest integer
-        p[0] = (int)(p[0] + dx +(0.5))
-        p[1] = (int)(p[1] + dy + (0.5))
-        #print("p:", p)
-
-    return get_point_dist(l, p) - get_point_dist(r, p)
 
 
 

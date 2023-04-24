@@ -6,12 +6,7 @@ import a_star
 import send_to_pi
 import line_follow
 
-# how to use: 
-# 1: hook up camera
-# 2: press run in vs code in the correct directory where this file is. You will see all detected tags. Hold A B or C to set it as your target
-# 3: press q to get just outlines of objects and a path drawn. This is our motion plan
-# 4: press q again to get a live view of the objects and the motion plan
-# 5: q again to exit
+
 
 # Set up camera and AprilTag detector
 cap = cv2.VideoCapture(0)
@@ -25,10 +20,10 @@ detector = apriltag.Detector(options)
 tag_size = 6  # cm
 focal_length = 60  # pixels
 
-car_tag_id = 0
+car_tag_id = 3
 A_tag_id = 1
 B_id_tag = 2
-C_id_tag = 3
+C_id_tag = 4
 target_tag_id = A_tag_id
 destination_tag_id = 4
 car_corners = ()
@@ -40,12 +35,12 @@ pid = line_follow.pid_controller(0, 0, 40, 0.01, 0, 0)
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
 
-read_from_image = True # read from image, TRUE; read from live camera, FALSE
+read_from_image = False # read from image, TRUE; read from live camera, FALSE
 
 jpg_fn = "test_1.jpeg"
 
 # Define the size of the grid that we will run a* from 
-grid_size = (20, 40)
+grid_size = (20, 20)
 
 # Initialize empty path for tag ID 0
 car_path = []
@@ -226,13 +221,13 @@ with np.printoptions(threshold=np.inf):
 
 #RUNS ASTAR ON "grid" matrix with car_loc_cell, target_loc_cell, obstacle_locs_cell
 a_star_path_cell_to_target = a_star.astar(maze=grid, start=car_loc_cell, end=target_loc_cell, allow_diagonal_movement=True)
-a_star_path_cell_to_destination = a_star.astar(maze=grid, start=target_loc_cell, end=destination_loc_cell, allow_diagonal_movement=True)
+#a_star_path_cell_to_destination = a_star.astar(maze=grid, start=target_loc_cell, end=destination_loc_cell, allow_diagonal_movement=True)
 
 # converts cell coordinates into pixel coordinates
 for cell in a_star_path_cell_to_target:
     a_star_path_pixels_to_target.append( cells_to_pixels(cell) )
-for cell in a_star_path_cell_to_destination:
-    a_star_path_pixels_to_destination.append( cells_to_pixels(cell) )
+#for cell in a_star_path_cell_to_destination:
+#    a_star_path_pixels_to_destination.append( cells_to_pixels(cell) )
 
 # add path to the photo in red
 for i in range(len(a_star_path_pixels_to_target)-1):
@@ -330,6 +325,7 @@ while True:
 
         # Update path for tag ID 
         if tag_id == car_tag_id:
+            
             center = tag.center.astype(int)
             car_path.append(center)
             for i in range(len(car_path)-1):
@@ -340,12 +336,15 @@ while True:
             car_corners = tag.corners.astype(int)
             
     
-        #Do PID update:
-        pid.measuremet = line_follow.get_car_to_path_distance(car_corners, frame)
-        op = pid.calculate_output()
-        pid.update_output(op)
-        send_to_pi.set_steering(pi,pid.output)
-        print("PID output: ", pid.output)
+    #Do PID update:
+    line_follow.get_car_to_path_distance(pid,car_corners, frame)
+    op = pid.calculate_output()
+    pid.update_output(op)
+    #send_to_pi.set_steering(pi,pid.output)
+    print()
+    print("PID measurement: ", pid.measurement)
+    print("PID output: ", pid.output)
+    
 
 
     cv2.imshow("AprilTag Tracking Live", frame)
