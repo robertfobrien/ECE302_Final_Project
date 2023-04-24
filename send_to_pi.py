@@ -1,14 +1,29 @@
-#https://towardsdatascience.com/sending-data-from-a-raspberry-pi-sensor-unit-over-serial-bluetooth-f9063f3447af
+# send to pi
+#!/usr/bin/env python
 
-#give the path to the bluetooth serial port for the RPI
-def open_comms(path):
-     with open(path, 'w', 1) as f:
-        return f
+import pigpio
 
-#set motor compare value for PWM
-def set_motor(value, f):
-    f.write('m;%f\n', value)
+motor_pin = 0    # set
+steering_pin = 0 # set
+port = "8888"        # port of RPI on localhost
 
-#set steering PWM 
-def set_steering(value, f):
-    f.write('s;%f\n', value)
+
+def initialize_pi():
+   pi = pigpio.pi(port=port)
+   if pi.connected:
+      return pi
+   else:
+      print("Pi is not connected")
+   
+def stop_pi(pi):
+   pi.stop()
+
+def set_motor(pi,cv):
+   pi.set_servo_pulsewidth(motor_pin, cv)
+
+def set_steering(pi,cv):
+   pi.set_servo_pulsewidth(steering_pin, cv)
+
+def set_pwm(pi,pin, cv):
+   pi.set_servo_pulsewidth(pin, cv)
+
