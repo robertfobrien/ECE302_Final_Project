@@ -1,8 +1,10 @@
+#live april
 import cv2
 import apriltag
 import numpy as np
 import a_star
 import send_to_pi
+import line_follow
 
 # how to use: 
 # 1: hook up camera
@@ -29,6 +31,11 @@ B_id_tag = 2
 C_id_tag = 3
 target_tag_id = A_tag_id
 destination_tag_id = 4
+car_corners = ()
+
+pi = send_to_pi.initialize_pi()
+
+pid = line_follow.pid_controller(0, 0, 40, 0.01, 0, 0)
 
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
@@ -38,7 +45,7 @@ read_from_image = True # read from image, TRUE; read from live camera, FALSE
 jpg_fn = "test_1.jpeg"
 
 # Define the size of the grid that we will run a* from 
-grid_size = (20, 30)
+grid_size = (20, 40)
 
 # Initialize empty path for tag ID 0
 car_path = []
@@ -203,17 +210,23 @@ for i in range(grid_size[0]):
             # If so, set the entire cell to red
            blank[i*cell_height:(i+1)*cell_height, j*cell_width:(j+1)*cell_width] = (0, 0, 255)  
 
-            #sets obstacles in the grid, or 'maze'
-        #    print(i, j)
+          #sets obstacles in the grid, or 'maze', to TRUE 
            grid[i:i+1,  j:j+1] = 1
+        
+        #artificially sets the outer borders to obstacles
+        #if i is grid_size[0]-1 or i == 0:
+        #    grid[i,  j] = 1
+
+        #if j is grid_size[1]-1 or j == 0:
+        #    grid[i,  j] = 1
 
 #prints the full grid: 
-#with np.printoptions(threshold=np.inf):
-#    print(grid)
+with np.printoptions(threshold=np.inf):
+    print(grid)
 
 #RUNS ASTAR ON "grid" matrix with car_loc_cell, target_loc_cell, obstacle_locs_cell
-a_star_path_cell_to_target = a_star.astar(maze=grid, start=car_loc_cell, end=target_loc_cell)
-a_star_path_cell_to_destination = a_star.astar(maze=grid, start=target_loc_cell, end=destination_loc_cell)
+a_star_path_cell_to_target = a_star.astar(maze=grid, start=car_loc_cell, end=target_loc_cell, allow_diagonal_movement=True)
+a_star_path_cell_to_destination = a_star.astar(maze=grid, start=target_loc_cell, end=destination_loc_cell, allow_diagonal_movement=True)
 
 # converts cell coordinates into pixel coordinates
 for cell in a_star_path_cell_to_target:
@@ -226,8 +239,8 @@ for i in range(len(a_star_path_pixels_to_target)-1):
                 cv2.line(blank, a_star_path_pixels_to_target[i], a_star_path_pixels_to_target[i+1], (0, 0, 255), 2)
 
 # add path to the photo in blue
-for i in range(len(a_star_path_pixels_to_destination)-1):
-                cv2.line(blank, a_star_path_pixels_to_destination[i], a_star_path_pixels_to_destination[i+1], (0, 255, 0), 2)
+#for i in range(len(a_star_path_pixels_to_destination)-1):
+#                cv2.line(blank, a_star_path_pixels_to_destination[i], a_star_path_pixels_to_destination[i+1], (0, 255, 0), 2)
 
 print ("Now showing the A * algoritm. This is the path the car will follow. Press 'q' to go back to live feed with the path overlayed.")
 print()
@@ -310,6 +323,11 @@ while True:
         #cv2.putText(frame, "Distance: {:.2f} meters".format(distance), (corners[0][0], corners[0][1] - 60), 
         #            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
         
+        
+        #draw start --> target on window
+        for i in range(len(a_star_path_pixels_to_target)-1):
+                cv2.line(frame, tuple(a_star_path_pixels_to_target[i]), tuple(a_star_path_pixels_to_target[i+1]), (0, 0, 255), 2)
+
         # Update path for tag ID 
         if tag_id == car_tag_id:
             center = tag.center.astype(int)
@@ -317,14 +335,17 @@ while True:
             for i in range(len(car_path)-1):
                 cv2.line(frame, tuple(car_path[i]), tuple(car_path[i+1]), (255, 0, 0), 2)
                 cv2.line(blank, tuple(car_path[i]), tuple(car_path[i+1]), (255, 0, 0), 2)
-        
-        #draw start --> target on window
-        for i in range(len(a_star_path_pixels_to_target)-1):
-                cv2.line(frame, tuple(a_star_path_pixels_to_target[i]), tuple(a_star_path_pixels_to_target[i+1]), (0, 0, 255), 2)
 
-        #draw target --> dest on window
-        for i in range(len(a_star_path_pixels_to_destination)-1):
-                cv2.line(frame, tuple(a_star_path_pixels_to_destination[i]), tuple(a_star_path_pixels_to_destination[i+1]), (0, 255, 0), 2)
+            #USES LINEFOLLOW CLASs
+            car_corners = tag.corners.astype(int)
+            
+    
+        #Do PID update:
+        pid.measuremet = line_follow.get_car_to_path_distance(car_corners, frame)
+        op = pid.calculate_output()
+        pid.update_output(op)
+        send_to_pi.set_steering(pi,pid.output)
+        print("PID output: ", pid.output)
 
 
     cv2.imshow("AprilTag Tracking Live", frame)
