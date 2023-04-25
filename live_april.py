@@ -6,6 +6,7 @@ import a_star
 import send_to_pi
 import line_follow
 import serial
+import math
 
 
 
@@ -30,7 +31,7 @@ destination_tag_id = 4
 car_corners = ()
 
 
-pid = line_follow.pid_controller(0, 4.4, 8.8, 0.11, 0, 0)
+pid = line_follow.pid_controller(6.6, 4.4, 8.8, 0.05, 0, 0)
 
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
@@ -269,6 +270,9 @@ while True:
     blank = np.zeros((frame.shape[0] , frame.shape[1],3), np.uint8)
 
     
+    target_center = []
+    car_center = []
+
     # Draw bounding boxes around detected tags and calculate distance
     for tag in tags:
         # Get tag ID and corner coordinates
@@ -282,6 +286,7 @@ while True:
         if tag_id == car_tag_id:
             color = (0, 255, 0)  #blue
             label = "Car"
+            car_center = tag.center.astype(int)
         elif tag_id == A_tag_id:
             color = (0, 0, 255)  # Red
             label = "A"
@@ -301,6 +306,7 @@ while True:
         #overwrites whatever one is the target box to make it green
         if tag_id == target_tag_id:
             color = (255, 0, 0)  # blue
+            target_center = tag.center.astype(int)
         
         #cv2.polylines(frame, [corners], True, color, 3)
         #print(tag.center.astype(int))
@@ -347,9 +353,12 @@ while True:
     print("PID measurement: ", pid.measurement)
     print("PID output: ", pid.output)
 
+
     send_to_pi.send_to_pi(ser,(str)(pid.output))
 
-    
+    # the target and the car are less than X pixels away
+    if math.dist(car_center,target_center) < 100:
+        send_to_pi.send_to_pi(ser,(str)("stop"))
 
 
 
@@ -357,6 +366,12 @@ while True:
     
     # Press 'q' to quit
     if cv2.waitKey(1) & 0xFF == ord('q'):
+        send_to_pi.send_to_pi(ser,(str)("stop"))
+        break
+
+    # Press 's' to start motor
+    if cv2.waitKey(1) & 0xFF == ord('s'):
+        send_to_pi.send_to_pi(ser,(str)(70))
         break
 
 

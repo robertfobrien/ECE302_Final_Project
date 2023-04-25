@@ -18,7 +18,7 @@ class pid_controller:
         self.error = 0
         self.prevError = 0
         self.measurement = 0
-        self.output = 2
+        self.output = 6.6
         self.prevOutput = 0 
         self.setPoint = setpoint
         self.Kp = Kp
