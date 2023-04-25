@@ -5,6 +5,7 @@ import numpy as np
 import a_star
 import send_to_pi
 import line_follow
+import serial
 
 
 
@@ -20,7 +21,7 @@ detector = apriltag.Detector(options)
 tag_size = 6  # cm
 focal_length = 60  # pixels
 
-car_tag_id = 3
+car_tag_id = 0
 A_tag_id = 1
 B_id_tag = 2
 C_id_tag = 4
@@ -28,9 +29,8 @@ target_tag_id = A_tag_id
 destination_tag_id = 4
 car_corners = ()
 
-pi = send_to_pi.initialize_pi()
 
-pid = line_follow.pid_controller(0, 0, 40, 0.01, 0, 0)
+pid = line_follow.pid_controller(0, 4.4, 8.8, 0.11, 0, 0)
 
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
@@ -40,7 +40,7 @@ read_from_image = False # read from image, TRUE; read from live camera, FALSE
 jpg_fn = "test_1.jpeg"
 
 # Define the size of the grid that we will run a* from 
-grid_size = (20, 20)
+grid_size = (40, 30)
 
 # Initialize empty path for tag ID 0
 car_path = []
@@ -250,6 +250,8 @@ while True:
 print("Now back in live feed. Press 'q' again and the car will begin its route:")
 print()
 
+ser = serial.Serial(port = '/dev/tty.usbserial-DN062958', baudrate=115200,timeout=None)
+
 while True:
     # Capture image from camera
 
@@ -344,7 +346,11 @@ while True:
     print()
     print("PID measurement: ", pid.measurement)
     print("PID output: ", pid.output)
+
+    send_to_pi.send_to_pi(ser,(str)(pid.output))
+
     
+
 
 
     cv2.imshow("AprilTag Tracking Live", frame)
