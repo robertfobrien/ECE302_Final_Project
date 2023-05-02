@@ -3,6 +3,7 @@
 
 import math
 import cv2
+import numpy as np
 
 class pid_controller:
     """ 
@@ -119,6 +120,30 @@ def get_tag_dist(tag1, tag2):
 #gets the distance between two points
 def get_point_dist(point1, point2):
     return math.dist(point1, point2)
+
+def combine_images(background_fn, overlay_fn):
+    background = cv2.imread(background_fn)
+    overlay = cv2.imread(overlay_fn, cv2.IMREAD_UNCHANGED)  # IMREAD_UNCHANGED => open image with the alpha channel
+
+    height, width = overlay.shape[0], overlay.shape[1]
+    print(height)
+    print(width)
+    for y in range(height-3):
+        for x in range(width-3):
+            overlay_color = overlay[y, x, :3]  # first three elements are color (RGB)
+            overlay_alpha = overlay[y, x, 3] / 255  # 4th element is the alpha channel, convert from 0-255 to 0.0-1.0
+
+            # get the color from the background image
+            background_color = background[y, x]
+
+            # combine the background color and the overlay color weighted by alpha
+            composite_color = background_color * (1 - overlay_alpha) + overlay_color * overlay_alpha
+
+            # update the background image in place
+            background[y, x] = composite_color
+
+    return background
+
 
 #test: 
 #pid = pid_controller(20, 0, 40, 0.01, 0, 0)

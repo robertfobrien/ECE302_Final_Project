@@ -30,21 +30,28 @@ target_tag_id = A_tag_id
 destination_tag_id = 4
 car_corners = ()
 
+car_speed = 70
 
-pid = line_follow.pid_controller(6.6, 4.4, 8.8, 0.05, 0, 0)
+
+pid = line_follow.pid_controller(6.6, 4.4, 8.8, 0.1, 0, 0)
 
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
 
-read_from_image = False # read from image, TRUE; read from live camera, FALSE
+read_from_image = True # read from image, TRUE; read from live camera, FALSE
 
-jpg_fn = "test_1.jpeg"
+jpg_fn = "calibration_2.jpg"
 
 # Define the size of the grid that we will run a* from 
 grid_size = (40, 30)
 
 # Initialize empty path for tag ID 0
 car_path = []
+
+
+ser = serial.Serial(port = '/dev/tty.usbserial-DN062958', baudrate=115200,timeout=None)
+
+send_to_pi.send_to_pi(ser,(str)("stop"))
 
 # END SETTINGs
 
@@ -56,6 +63,8 @@ while True:
     if read_from_image == True:
         ret = True
         frame = cv2.imread(jpg_fn)
+        #overlay_fn = "track-1.png"
+        #frame = line_follow.combine_images(jpg_fn, overlay_fn)
     else:
         ret, frame = cap.read()
 
@@ -72,6 +81,8 @@ while True:
         corners = tag.corners.astype(int)
         # pose gives us direction and size data etc. could be useful later
         tag_pose = detector.detection_pose(detection=tag, camera_params=camera_params, tag_size=30, z_sign=1)
+
+        #print("tag_id", tag_id)
 
         # Draw bounding box with color based on tag ID
         if tag_id == car_tag_id:
@@ -251,7 +262,11 @@ while True:
 print("Now back in live feed. Press 'q' again and the car will begin its route:")
 print()
 
-ser = serial.Serial(port = '/dev/tty.usbserial-DN062958', baudrate=115200,timeout=None)
+
+#sets the motor speed to whatever we set this to
+#remember its inverse, so 10 = 90% duty cycel, and so on
+send_to_pi.send_to_pi(ser,(str)("start"))
+send_to_pi.send_to_pi(ser,(str)(car_speed))
 
 while True:
     # Capture image from camera
@@ -272,6 +287,9 @@ while True:
     
     target_center = []
     car_center = []
+    car_speed = []
+
+
 
     # Draw bounding boxes around detected tags and calculate distance
     for tag in tags:
@@ -286,6 +304,7 @@ while True:
         if tag_id == car_tag_id:
             color = (0, 255, 0)  #blue
             label = "Car"
+            car_speed = car_center - tag.center.astype(int)
             car_center = tag.center.astype(int)
         elif tag_id == A_tag_id:
             color = (0, 0, 255)  # Red
@@ -318,9 +337,6 @@ while True:
         distance = (tag_size * focal_length) / tag_size_in_pixels
         
 
-        # Put tag ID and distance on the image
-        #cv2.putText(frame, "{}".format(label), (corners[0][0], corners[0][1] - 20), 
-        #            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
         #cv2.putText(blank, "{}".format(label), (corners[0][0], corners[0][1] - 20), 
         #            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
         #cv2.putText(frame, "Distance: {:.2f} meters".format(distance), (corners[0][0], corners[0][1] - 60), 
@@ -344,6 +360,11 @@ while True:
             car_corners = tag.corners.astype(int)
             
     
+    try:
+        cv2.putText(frame, (str)(math.dist(car_center,target_center)), (target_center[0], target_center[1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    except:
+        break
+
     #Do PID update:
     line_follow.get_car_to_path_distance(pid,car_corners, frame)
     op = pid.calculate_output()
@@ -357,7 +378,7 @@ while True:
     send_to_pi.send_to_pi(ser,(str)(pid.output))
 
     # the target and the car are less than X pixels away
-    if math.dist(car_center,target_center) < 100:
+    if math.dist(car_center,target_center) < 80:
         send_to_pi.send_to_pi(ser,(str)("stop"))
 
 
@@ -374,6 +395,18 @@ while True:
         send_to_pi.send_to_pi(ser,(str)(70))
         break
 
+print("\n\nShowing final image...")
+
+while 1:
+    
+    cv2.imshow("AprilTag Tracking Final", frame)
+    photo_filename = f"final_frame.jpg"
+    cv2.imwrite(photo_filename, frame)
+    photo_filename = f"final_black.jpg"
+    cv2.imwrite(photo_filename, blank)
+    # Press 'q' to quit
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
 # now we want some sort of PID controller to follow the line
 
