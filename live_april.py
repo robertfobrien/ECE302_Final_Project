@@ -30,15 +30,15 @@ target_tag_id = A_tag_id
 destination_tag_id = 4
 car_corners = ()
 
-car_speed = 70
+car_speed = 55
 
 
-pid = line_follow.pid_controller(6.6, 4.4, 8.8, 0.1, 0, 0)
+pid = line_follow.pid_controller(6.6, 4.4, 8.8, 0.2, 0, 0)
 
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
 
-read_from_image = True # read from image, TRUE; read from live camera, FALSE
+read_from_image = False # read from image, TRUE; read from live camera, FALSE
 
 jpg_fn = "calibration_2.jpg"
 
@@ -268,6 +268,12 @@ print()
 send_to_pi.send_to_pi(ser,(str)("start"))
 send_to_pi.send_to_pi(ser,(str)(car_speed))
 
+target_center = []
+car_center = [0,0]
+car_speed_vector = [0,0]
+old_car_center = [0,0]
+car_speed_error = 0
+
 while True:
     # Capture image from camera
 
@@ -284,11 +290,6 @@ while True:
     	
     blank = np.zeros((frame.shape[0] , frame.shape[1],3), np.uint8)
 
-    
-    target_center = []
-    car_center = []
-    car_speed = []
-
 
 
     # Draw bounding boxes around detected tags and calculate distance
@@ -304,8 +305,36 @@ while True:
         if tag_id == car_tag_id:
             color = (0, 255, 0)  #blue
             label = "Car"
-            car_speed = car_center - tag.center.astype(int)
+            
+            # here we set up a very easy and simple speed control
+            setpoint = 100
+            start_speed = 55
+            kp = 0.1
+
             car_center = tag.center.astype(int)
+            car_speed_vector = (old_car_center[0] - car_center[0],old_car_center[1] - car_center[1])
+            old_car_center = car_center
+
+            car_speed_scalar = np.sqrt(car_speed_vector[0]**2 + car_speed_vector[1]**2)
+            car_speed_error = car_speed_scalar - setpoint
+
+            if(car_speed_error > 0):
+                car_speed = start_speed + kp*car_speed_error;
+            else:
+                car_speed = start_speed - kp*car_speed_error;
+            
+            send_to_pi.send_to_pi(ser,(str)("start"))
+            send_to_pi.send_to_pi(ser,(str)(car_speed))
+
+            print("car speed: ", car_speed)
+            print("car error: ", car_speed_error)
+            print()
+            
+            
+
+            cv2.putText(frame, "{}".format(np.round(car_speed_scalar)), (corners[0][0], corners[0][1] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            
+
         elif tag_id == A_tag_id:
             color = (0, 0, 255)  # Red
             label = "A"
@@ -370,9 +399,9 @@ while True:
     op = pid.calculate_output()
     pid.update_output(op)
     #send_to_pi.set_steering(pi,pid.output)
-    print()
-    print("PID measurement: ", pid.measurement)
-    print("PID output: ", pid.output)
+    #print()
+    #print("PID measurement: ", pid.measurement)
+    #print("PID output: ", pid.output)
 
 
     send_to_pi.send_to_pi(ser,(str)(pid.output))
