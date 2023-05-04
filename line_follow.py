@@ -1,5 +1,5 @@
-# vortual line_follow
-#made by robert o'brien
+# virtual line_follow
+# made by robert o'brien
 
 import math
 import cv2
@@ -12,7 +12,7 @@ class pid_controller:
     pid = pid_controller(20, 0, 40, 0.01, 0, 0)
     """
 
-    def __init__(self, setpoint, limMin, limMax, Kp, Ki, Kd):
+    def __init__(self, middlePoint, limMin, limMax, Kp, Ki, Kd):
         self.integrator = 0
         self.proportional = 0
         self.derivative = 0
@@ -21,7 +21,7 @@ class pid_controller:
         self.measurement = 0
         self.output = 6.6
         self.prevOutput = 0 
-        self.setPoint = setpoint
+        self.middlepoint = middlePoint
         self.Kp = Kp
         self.Kd = Kd
         self.Ki = Ki
@@ -33,19 +33,17 @@ class pid_controller:
 
     def calculate_output(self):
         #calculate errors
-        self.error = self.setPoint - self.measurement;
+        self.error = self.measurement
+
 
         #PROPORTIONAL
-        self.proportional = self.Kp*self.error;
-        
-        # INTEGRATOR
-        self.integrator = self.Ki*(self.integrator + self.error);
-        
-        #DIFFERENTIATOR
-        self.derivative = self.Kd*(self.error - self.prevError);
+        self.proportional = self.Kp*self.error
+
+        #DERIVATIVE
+        self.derivative = (self.error - self.prevError)*self.Kd
 
         #OUTPUT CALCULATION
-        self.output = self.setPoint - (self.proportional + self.integrator + self.derivative);
+        self.output = self.middlepoint + (self.proportional)
     
         #output clamping
         if((int)(self.output) > (int)(self.limMax)):
@@ -67,34 +65,43 @@ class pid_controller:
 def get_middle_point(point1, point2):
     return ((point1[0]+point2[0]) // 2, (point1[1]+point2[1]) // 2 )
 
-#takes in the corners of the car AprilTag, and the image with the line it should be following
-#returns some value corresponding to the car in relation to the line
+# takes in the corners of the car AprilTag, and the image with the line it should be following
+# returns a value corresponding to the car in relation to the line
 def get_car_to_path_distance(pid, car_corners, image):
-    # left middle part of car tag
-    l = get_middle_point(car_corners[0],car_corners[3])
-    # right middle part of car tag
-    r = get_middle_point(car_corners[1],car_corners[2])
+    #car_corners: 
+        # 0 = top left
+        # 1 = top right
+        # 2 = bottom left
+        # 3 = bottom right
+
+    # front left part of the car
+    l = car_corners[0]
+    # front right corner of the car
+    r = car_corners[1]
+
     dist = get_point_dist(l,r)
+
     p = [l[0], l[1]]
 
-    #print("r:", r)
-    #print("l:", l)
     #change in x and y pixel per step
     dx = ((r[0]-l[0]) / dist)
     dy = ((r[1]-l[1]) / dist)
-
-    #print("dx:", dx)
-    #print("dy:", dy)
-    #print("dist:", dist)
-    #print("image shape: ", image.shape)
-
+    #print("dx:", dx," dy:", dy)
 
     while True:
-
-         #iterates through every pixel between the left and right parts of the tag
+        #iterates through every pixel between the left and right parts of the tag
         # the 0.5 is a trick to to round to make sure we round to nearest integer
-        p[0] = (int)(p[0] + dx +(0.5))
-        p[1] = (int)(p[1] + dy + (0.5))
+        if dx > 0:
+            p[0] = (int)(p[0] + dx + (0.5))
+        else:
+            p[0] = (int)(p[0] + dx - (0.5))
+        
+        if dy > 0:
+            p[1] = (int)(p[1] + dy + (0.5))
+        else: 
+            p[1] = (int)(p[1] + dy - (0.5))
+
+        
 
         # if the  pixel is pure red: 
         #print("     image r:", (int)(image[p[1],p[0]][2]))
@@ -143,9 +150,5 @@ def combine_images(background_fn, overlay_fn):
             background[y, x] = composite_color
 
     return background
-
-
-#test: 
-#pid = pid_controller(20, 0, 40, 0.01, 0, 0)
 
 
