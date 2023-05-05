@@ -2,6 +2,8 @@
 # R. O'Brien May 2023
 import cv2
 import apriltag
+from phidl import Path, CrossSection, Device
+import phidl.path as pp
 import numpy as np
 import a_star
 import send_to_pi
@@ -28,12 +30,12 @@ target_tag_id = A_tag_id
 destination_tag_id = 4
 car_corners = () 
 car_speed = 55 # speed is in duty cycle. 100 is min, 0 is max
-pid = line_follow.pid_controller(6.6, 4.2, 9, 0.1, 0, 0)
+pid = line_follow.pid_controller(6.6, 4.4, 8.8, 0.2, 0, 0)
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
 read_from_image = False # True to read from image; False to read from live camera
-draw_path = False
-jpg_fn = "calibration_2.jpg" # image filename
+draw_path = False #draw your own path for the car to follow
+jpg_fn = "calibration_3.jpg" # image filename
 grid_size = (40, 30) # Define the size of the grid that we will run a* from 
 car_path = [] # Initialize empty path for tag ID 0
 drawing = False # true if mouse is pressed
@@ -60,6 +62,8 @@ while True:
         #frame = line_follow.combine_images(jpg_fn, overlay_fn)
     else:
         ret, frame = cap.read()
+        send_to_pi.send_to_pi(ser,(str)("stop"))
+        print("sent stop...")
 
     # Detect AprilTags in image
     frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -120,6 +124,7 @@ while True:
     
     # Press 'q' to quit
     if cv2.waitKey(1) & 0xFF == ord('q'):
+        print("running A* and smoothing algorith...\n")
         break
 
     # Press 'a' to set a as the target
@@ -152,6 +157,7 @@ target_loc_cell = []
 destination_loc_cell = []
 a_star_path_cell_to_target = []
 grid = np.zeros(shape=grid_size, dtype=int)
+center_helper = []
 
 height, width, channels = blank.shape
 cell_width = width // grid_size[1]
@@ -178,7 +184,8 @@ for tag in tags:
         target_loc_cell = pixels_to_cell(center)
     elif tag.tag_id is car_tag_id:
         car_loc_pixels = center
-        car_loc_cell = pixels_to_cell(center)
+        car_loc_cell = pixels_to_cell( ( center[0] + 100 , center[1] ) )
+        center_helper = pixels_to_cell( center )
     else:
         obstacle_locs_pixels.append( center )
         obstacle_locs_cell.append( pixels_to_cell(center) )
@@ -212,7 +219,8 @@ for i in range(grid_size[0]):
                grid[i:i+1,  j:j+1] = 1
                #try to fill in an expanded boundary
                grid[i-1:i+2,  j-1:j+2] = 1
-               #even more:
+
+               #try to fill in an expanded boundary LARGER EXPANSIOn
                grid[i-2:i+3,  j-2:j+3] = 1
             except:
                 print("Expanded boundary failed")
@@ -234,13 +242,39 @@ def print_grid():
 #RUNS ASTAR ON "grid" matrix with car_loc_cell, target_loc_cell, obstacle_locs_cell
 a_star_path_cell_to_target = a_star.astar(maze=grid, start=car_loc_cell, end=target_loc_cell, allow_diagonal_movement=True)
 
+#this is to make sure the line goes through the center
+a_star_path_pixels_to_target.append(car_loc_pixels)
+
 # converts cell coordinates back into pixel coordinates
 for cell in a_star_path_cell_to_target:
     a_star_path_pixels_to_target.append( cells_to_pixels(cell) )
 
+
+
+rad = 1
+while True:
+    try:
+        P = pp.smooth(
+            points = a_star_path_pixels_to_target,
+            radius = rad,
+            corner_fun = pp.euler, # Alternatively, use pp.arc
+            use_eff = False,
+            )
+    except:
+        print("p not exist")
+        break
+
+    if rad > 150:
+        break
+
+    rad = rad + 1
+print("Max radius is found to be: " ,rad, "\n")
+
+a_star_path_pixels_to_target = P.points
+
 # add the intended path to the frame in pure RGB RED
 for i in range(len(a_star_path_pixels_to_target)-1):
-                cv2.line(blank, a_star_path_pixels_to_target[i], a_star_path_pixels_to_target[i+1], (0, 0, 255), 2)
+                cv2.line(blank, ((int)(a_star_path_pixels_to_target[i][0]), (int)(a_star_path_pixels_to_target[i][1])), ((int)(a_star_path_pixels_to_target[i+1][0]), (int)(a_star_path_pixels_to_target[i+1][1])), (0, 0, 255), 2)
 
 ########################################################################################################################
 
@@ -298,6 +332,7 @@ print()
 # *NOTE remember its inverse, so 10 = 90% duty cycel, and 90 = 10% duty cycle
 try:
     send_to_pi.send_to_pi(ser,"speed:"+(str)(car_speed))
+    print("speed:"+(str)(car_speed))
 except:
     pass
 
@@ -338,9 +373,9 @@ while True:
             
             # here we set up a very easy and simple speed control
             setpoint = 3 # in pixels / frame
-            start_speed = 70 # in duty cycle out of 100 (0 is high, 100 is low)
-            kp = 7
-
+            start_speed = 90 # in duty cycle out of 100 (0 is high, 100 is low)
+            kp = 2
+            
             car_center = tag.center.astype(int)
             car_speed_vector = (old_car_center[0] - car_center[0],old_car_center[1] - car_center[1])
             old_car_center = car_center
@@ -353,10 +388,12 @@ while True:
             #sends over XBee to control car speed
             try:
                 send_to_pi.send_to_pi(ser,"speed:"+(str)(car_speed))
+                print("speed:"+(str)(car_speed))
             except:
-                print("Serial not found")
-            print("car speed: ", car_speed)
-            print("car speed error: ", car_speed_error)
+                #print("Serial not found")
+                pass
+            #print("car speed: ", car_speed)
+            #print("car speed error: ", car_speed_error)
             #print()
             
             #draws car speed error over car 
@@ -392,7 +429,7 @@ while True:
         else:
             # draw the line we're following, start --> target, on the frame
             for i in range(len(a_star_path_pixels_to_target)-1):
-                cv2.line(frame, tuple(a_star_path_pixels_to_target[i]), tuple(a_star_path_pixels_to_target[i+1]), (0, 0, 255), 2)
+                cv2.line(frame, ((int)(a_star_path_pixels_to_target[i][0]), (int)(a_star_path_pixels_to_target[i][1])), ((int)(a_star_path_pixels_to_target[i+1][0]), (int)(a_star_path_pixels_to_target[i+1][1])), (0, 0, 255), 2)
         
         # Update path for tag ID 
         if tag_id == car_tag_id:
@@ -426,12 +463,16 @@ while True:
     # sends the steering direction to be sent to the pi
     try:
         send_to_pi.send_to_pi(ser,"steer:"+(str)(pid.output))
+        print("steer:"+(str)(pid.output))
     except:
-        print("Serial not found")
+        #print("Serial not found")
+        pass
 
     # the target and the car are less than X pixels away
     if math.dist(car_center,target_center) < 80:
-        send_to_pi.send_to_pi(ser,(str)("stop"))
+        send_to_pi.send_to_pi(ser,(str)("claw"))
+        print((str)("auto stop, and claw"))
+        break
 
     #shows the image: 
     cv2.imshow("AprilTag Tracking", frame)
@@ -439,16 +480,18 @@ while True:
     # Press 'q' to quit
     if cv2.waitKey(1) & 0xFF == ord('q'):
         send_to_pi.send_to_pi(ser,(str)("stop"))
+        print((str)("stop"))
         break
 
 ######################################################################################################################
+
 
 # Now completed path. Showing final image that the car drove, and saving that file:
 
 print("\n\nShowing final image...")
 
 while 1:
-    
+    send_to_pi.send_to_pi(ser,(str)("stop"))
     cv2.imshow("AprilTag Tracking", frame)
     photo_filename = f"final_frame.jpg"
     cv2.imwrite(photo_filename, frame)
