@@ -49,10 +49,6 @@ try:
 except:
     print("ERROR!: no serial port found")
 
-while 1:
-    print("uhh")
-    send_to_pi.send_to_pi(ser,"speed:"+(str)(75))
-    pass
 ###############################################################################################################################################
 
 print ("Now in setup mode. Set up the car and blocks to begin. Press A, B or C to make them the target blocks. Press 'q' to find a path.")
