@@ -23,7 +23,7 @@ detector = apriltag.Detector(options)
 tag_size = 6  # cm
 focal_length = 60  # pixels
 car_tag_id = 0 
-A_tag_id = 1
+A_tag_id = 8
 B_id_tag = 2
 C_id_tag = 4
 target_tag_id = A_tag_id
@@ -40,6 +40,7 @@ grid_size = (40, 30) # Define the size of the grid that we will run a* from
 car_path = [] # Initialize empty path for tag ID 0
 drawing = False # true if mouse is pressed
 pt1_x , pt1_y = None , None
+in_front_of_car = ()
 
 try:
     ser = serial.Serial(port = '/dev/tty.usbserial-DN062958', baudrate=115200,timeout=None) # sets up seial port
@@ -84,6 +85,7 @@ while True:
         if tag_id == car_tag_id:
             color = (0, 255, 0)  #green
             label = "Car"
+            in_front_of_car = (tag.center.astype(int)[0] + 100, tag.center.astype(int)[1])
         elif tag_id == A_tag_id:
             color = (0, 0, 255)  # Red
             label = "A"
@@ -218,10 +220,22 @@ for i in range(grid_size[0]):
                #try to fill in conservatively
                grid[i:i+1,  j:j+1] = 1
                #try to fill in an expanded boundary
-               grid[i-1:i+2,  j-1:j+2] = 1
+               grid[i:i+1,  j:j+1] = 1
 
-               #try to fill in an expanded boundary LARGER EXPANSIOn
-               grid[i-2:i+3,  j-2:j+3] = 1
+               grid[i:i+3,  j:j+3] = 1
+
+               grid[i:i+4,  j:j+4] = 1
+            except:
+                print("Expanded boundary failed")
+                pass
+
+            try:
+               #try to fill in conservatively
+               grid[i:i,  j-1:j] = 1
+               #try to fill in an expanded boundary
+               grid[i:i,  j-2:j] = 1
+
+               grid[i:i,  j-3:j] = 1
             except:
                 print("Expanded boundary failed")
                 pass
@@ -242,16 +256,27 @@ def print_grid():
 #RUNS ASTAR ON "grid" matrix with car_loc_cell, target_loc_cell, obstacle_locs_cell
 a_star_path_cell_to_target = a_star.astar(maze=grid, start=car_loc_cell, end=target_loc_cell, allow_diagonal_movement=True)
 
-#this is to make sure the line goes through the center
-a_star_path_pixels_to_target.append(car_loc_pixels)
 
 # converts cell coordinates back into pixel coordinates
 for cell in a_star_path_cell_to_target:
     a_star_path_pixels_to_target.append( cells_to_pixels(cell) )
 
+temp = []
+
+#this is to make sure the line goes through the center
+temp.append(car_loc_pixels)
+#temp.append((car_loc_pixels[0] + 20, car_loc_pixels[1]))
+
+for i in range(0, len(a_star_path_pixels_to_target)-2, 5):
+    temp.append(a_star_path_pixels_to_target[i])
+# add the end point
+temp.append(a_star_path_pixels_to_target[-1])
+temp[1] = in_front_of_car # might want to take this out
+a_star_path_pixels_to_target = temp
 
 
-rad = 1
+
+rad = 1 #radius starts at 1
 while True:
     try:
         P = pp.smooth(
@@ -342,6 +367,7 @@ car_center = [0,0]
 car_speed_vector = [0,0]
 old_car_center = [0,0]
 car_speed_error = 0
+ended = False
 
 while True:
 
@@ -373,7 +399,7 @@ while True:
             
             # here we set up a very easy and simple speed control
             setpoint = 3 # in pixels / frame
-            start_speed = 90 # in duty cycle out of 100 (0 is high, 100 is low)
+            start_speed = 85 # in duty cycle out of 100 (0 is high, 100 is low)
             kp = 2
             
             car_center = tag.center.astype(int)
@@ -460,6 +486,9 @@ while True:
     cv2.putText(frame,  "Steering error: %.1f" % pid.error, (5, 45), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
     cv2.putText(frame,  "Steering: %.1f" % op, (5, 125), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
+    if ended:
+        cv2.putText(frame,  "COMPLETE. CLAW MODE ACTIVATED.", (5, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
     # sends the steering direction to be sent to the pi
     try:
         send_to_pi.send_to_pi(ser,"steer:"+(str)(pid.output))
@@ -469,10 +498,10 @@ while True:
         pass
 
     # the target and the car are less than X pixels away
-    if math.dist(car_center,target_center) < 80:
+    if math.dist(car_center,target_center) < 80 and ended is False:
         send_to_pi.send_to_pi(ser,(str)("claw"))
         print((str)("auto stop, and claw"))
-        break
+        ended = True
 
     #shows the image: 
     cv2.imshow("AprilTag Tracking", frame)

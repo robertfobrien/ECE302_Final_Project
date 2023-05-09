@@ -75,15 +75,29 @@ def get_car_to_path_distance(pid, car_corners, image):
         # 3 = bottom right
 
     # front left part of the car
-    l = car_corners[0]
+    fl = car_corners[0]
     # front right corner of the car
-    r = car_corners[1]
+    fr = car_corners[1]
+    #back left
+    bl = car_corners[2]
+    #back right
+    br = car_corners[3]
+
+    # choosing l and r to be an extended version of the front of the car, as to anticipate movements
+    l_dy = fl[1] - bl[1]
+    l_dx = fl[0] - bl[0]
+    r_dy = fr[1] - br[1]
+    r_dx = fr[1] - br[1]
+    
+    l = (fl[0] + l_dx, fl[1] + l_dy)
+    r = (fr[0] + r_dx, fr[1] + r_dy)
 
     dist = get_point_dist(l,r)
 
     p = [l[0], l[1]]
 
     #change in x and y pixel per step
+    #normalizes the vector between the two points
     dx = ((r[0]-l[0]) / dist)
     dy = ((r[1]-l[1]) / dist)
     #print("dx:", dx," dy:", dy)
