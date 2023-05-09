@@ -33,8 +33,8 @@ car_speed = 55 # speed is in duty cycle. 100 is min, 0 is max
 pid = line_follow.pid_controller(6.6, 4.4, 8.8, 0.2, 0, 0)
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
-read_from_image = False # True to read from image; False to read from live camera
-draw_path = True #draw your own path for the car to follow
+read_from_image = True # True to read from image; False to read from live camera
+draw_path = False #draw your own path for the car to follow
 jpg_fn = "calibration_3.jpg" # image filename
 grid_size = (40, 30) # Define the size of the grid that we will run a* from 
 car_path = [] # Initialize empty path for tag ID 0
@@ -49,6 +49,10 @@ try:
 except:
     print("ERROR!: no serial port found")
 
+while 1:
+    print("uhh")
+    send_to_pi.send_to_pi(ser,"speed:"+(str)(75))
+    pass
 ###############################################################################################################################################
 
 print ("Now in setup mode. Set up the car and blocks to begin. Press A, B or C to make them the target blocks. Press 'q' to find a path.")
