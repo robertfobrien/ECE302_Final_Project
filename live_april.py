@@ -23,7 +23,7 @@ detector = apriltag.Detector(options)
 tag_size = 6  # cm
 focal_length = 60  # pixels
 car_tag_id = 0 
-A_tag_id = 8
+A_tag_id = 1
 B_id_tag = 2
 C_id_tag = 4
 target_tag_id = A_tag_id
@@ -225,7 +225,7 @@ for i in range(grid_size[0]):
 
                grid[i:i+3,  j] = 1
 
-               grid[i:i+4,  j] = 1
+               #grid[i:i+4,  j] = 1
 
                #grid[i:i+5,  j] = 1
             except:
@@ -255,11 +255,12 @@ for i in range(grid_size[0]):
 
                grid[i,  j:j+3] = 1
                
-               grid[i,  j:j+4] = 1
+               #grid[i,  j:j+4] = 1
 
-               grid[i,  j:j+5] = 1
+               #grid[i,  j:j+5] = 1
 
-               grid[i,  j:j+6] = 1
+               
+               #grid[i,  j:j+6] = 1
             except:
                 print("Expanded boundary failed")
                 pass
@@ -272,7 +273,7 @@ for i in range(grid_size[0]):
 
                grid[i,  j-3:j] = 1
 
-               grid[i,  j-4:j] = 1
+               #grid[i,  j-4:j] = 1
 
                #grid[i,  j-5:j] = 1
             except:
@@ -290,7 +291,11 @@ def print_grid():
     with np.printoptions(threshold=np.inf):
         print(grid)
 
-#print_grid()
+
+print("grid:")
+print_grid()
+print("car:,",car_loc_cell)
+print("tar,",target_loc_cell)
 
 #RUNS ASTAR ON "grid" matrix with car_loc_cell, target_loc_cell, obstacle_locs_cell
 a_star_path_cell_to_target = a_star.astar(maze=grid, start=car_loc_cell, end=target_loc_cell, allow_diagonal_movement=True)
