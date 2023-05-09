@@ -34,7 +34,7 @@ pid = line_follow.pid_controller(6.6, 4.4, 8.8, 0.2, 0, 0)
 fx, fy, cx, cy = (216.46208287856132, 199.68569189689305, 840.6661141370689, 518.01214031649) #found from calibrate_camera.py
 camera_params = (fx, fy, cx, cy)
 read_from_image = False # True to read from image; False to read from live camera
-draw_path = False #draw your own path for the car to follow
+draw_path = True #draw your own path for the car to follow
 jpg_fn = "calibration_3.jpg" # image filename
 grid_size = (40, 30) # Define the size of the grid that we will run a* from 
 car_path = [] # Initialize empty path for tag ID 0
@@ -216,26 +216,65 @@ for i in range(grid_size[0]):
             blank[i*cell_height:(i+1)*cell_height, j*cell_width:(j+1)*cell_width] = (0, 0, 255)  
 
             #sets obstacles in the grid, or 'maze', to TRUE. This is representing that an obstacle is in that position
+            #X+ 
             try:
-               #try to fill in conservatively
-               grid[i:i+1,  j:j+1] = 1
+               #try to fillq in conservatively
+               grid[i:i+1,  j] = 1
                #try to fill in an expanded boundary
-               grid[i:i+1,  j:j+1] = 1
+               grid[i:i+2,  j] = 1
 
-               grid[i:i+3,  j:j+3] = 1
+               grid[i:i+3,  j] = 1
 
-               grid[i:i+4,  j:j+4] = 1
+               grid[i:i+4,  j] = 1
+
+               #grid[i:i+5,  j] = 1
             except:
                 print("Expanded boundary failed")
                 pass
-
+            #X- 
             try:
                #try to fill in conservatively
-               grid[i:i,  j-1:j] = 1
+               grid[i-1:i,  j] = 1
                #try to fill in an expanded boundary
-               grid[i:i,  j-2:j] = 1
+               grid[i-2:i,  j] = 1
 
-               grid[i:i,  j-3:j] = 1
+               grid[i-2:i,  j] = 1
+               
+               grid[i-3:i,  j] = 1
+
+               #grid[i-4:i,  j] = 1
+            except:
+                print("Expanded boundary failed")
+                pass
+            #Y+ 
+            try:
+               #try to fill in conservatively
+               grid[i,  j:j+1] = 1
+               #try to fill in an expanded boundary
+               grid[i,  j:j+2] = 1
+
+               grid[i,  j:j+3] = 1
+               
+               grid[i,  j:j+4] = 1
+
+               grid[i,  j:j+5] = 1
+
+               grid[i,  j:j+6] = 1
+            except:
+                print("Expanded boundary failed")
+                pass
+            #Y- 
+            try:
+               #try to fill in conservatively
+               grid[i,  j-1:j] = 1
+               #try to fill in an expanded boundary
+               grid[i,  j-2:j] = 1
+
+               grid[i,  j-3:j] = 1
+
+               grid[i,  j-4:j] = 1
+
+               #grid[i,  j-5:j] = 1
             except:
                 print("Expanded boundary failed")
                 pass

@@ -89,8 +89,9 @@ def get_car_to_path_distance(pid, car_corners, image):
     r_dy = fr[1] - br[1]
     r_dx = fr[1] - br[1]
     
-    l = (fl[0] + l_dx, fl[1] + l_dy)
-    r = (fr[0] + r_dx, fr[1] + r_dy)
+    multiplier = 1.6
+    l = (fl[0] + (int)(l_dx*(multiplier)), fl[1] + (int)(l_dy*(multiplier)))
+    r = (fr[0] + (int)(r_dx*(multiplier)), fr[1] + (int)(r_dy*(multiplier)))
 
     dist = get_point_dist(l,r)
 
@@ -117,13 +118,6 @@ def get_car_to_path_distance(pid, car_corners, image):
 
         
 
-        # if the  pixel is pure red: 
-        #print("     image r:", (int)(image[p[1],p[0]][2]))
-        if (int)(image[p[1],p[0]][2]) == 255 and (int)(image[p[1],p[0]][1]) == 0 and (int)(image[p[1],p[0]][0]) == 0:
-            #print("found red pixel")
-            #print("output: ", math.dist(p,l) - math.dist(p,r))
-            pid.measurement = math.dist(p,l) - math.dist(p,r)
-
         if p[1] >= image.shape[0] - 5 or p[1] < 0 :
             #print("didnt find red line, went outside of image")
             break
@@ -131,6 +125,13 @@ def get_car_to_path_distance(pid, car_corners, image):
         if p[0] > image.shape[1] - 5 or p[0] < 0:
             #print("didnt find red line, went outside of image")
             break
+
+        # if the  pixel is pure red: 
+        #print("     image r:", (int)(image[p[1],p[0]][2]))
+        if (int)(image[p[1],p[0]][2]) == 255 and (int)(image[p[1],p[0]][1]) == 0 and (int)(image[p[1],p[0]][0]) == 0:
+            #print("found red pixel")
+            #print("output: ", math.dist(p,l) - math.dist(p,r))
+            pid.measurement = math.dist(p,l) - math.dist(p,r)
 
 
 
